@@ -1,12 +1,14 @@
 {
-  "day": 0,
+  "day": 1,
   "score": 1,
-  "proven": ["baseline: program builds, deploys, and initializes"],
+  "proven": [
+    "baseline: program builds, deploys, and initializes"
+  ],
   "gaps": [
     "SPL token transfers",
     "PDAs and bump seeds",
     "cross-program invocation (CPI)",
     "account constraints and validation"
   ],
-  "totalSpentUsd": 0
+  "totalSpentUsd": 1.9765599999999999
 }
