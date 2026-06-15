@@ -1,0 +1,20 @@
+{
+  "name": "player1-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "player1's body of work. The agent commits here. Grows one green concept at a time.",
+  "scripts": {
+    "blog": "node blog/build.js"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "chai": "^4.3.0",
+    "mocha": "^10.0.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.4.0"
+  }
+}
