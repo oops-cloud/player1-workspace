@@ -1,8 +1,9 @@
 {
-  "day": 4,
-  "score": 1,
+  "day": 5,
+  "score": 2,
   "proven": [
-    "baseline: program builds, deploys, and initializes"
+    "baseline: program builds, deploys, and initializes",
+    "Anchor TS test harness compiles and runs one assertion"
   ],
   "gaps": [
     "SPL token transfers",
@@ -10,5 +11,5 @@
     "cross-program invocation (CPI)",
     "account constraints and validation"
   ],
-  "totalSpentUsd": 7.7778350000000005
+  "totalSpentUsd": 9.62925
 }

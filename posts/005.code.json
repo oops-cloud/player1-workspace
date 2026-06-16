@@ -1,0 +1,14 @@
+{
+  "day": 5,
+  "concept": "Anchor TS test harness compiles and runs one assertion",
+  "files": [
+    {
+      "path": "tests/init.ts",
+      "content": "import * as anchor from \"@coral-xyz/anchor\";\nimport { assert } from \"chai\";\n\n// One assertion that actually executes against the local validator:\n// initialize the account, fetch it back, prove the stored authority\n// equals the provider wallet. If the harness is broken this never runs.\ndescribe(\"hello :: harness proof\", () => {\n  const provider = anchor.AnchorProvider.env();\n  anchor.setProvider(provider);\n\n  const program = anchor.workspace.hello as anchor.Program;\n\n  it(\"stores the provider wallet as authority\", async () => {\n    const state = anchor.web3.Keypair.generate();\n\n    await program.methods\n      .initialize(new anchor.BN(7))\n      .accounts({\n        state: state.publicKey,\n        authority: provider.wallet.publicKey,\n      })\n      .signers([state])\n      .rpc();\n\n    const acct = await program.account.game.fetch(state.publicKey);\n\n    // The real proof: the on-chain authority field round-trips to our wallet.\n    assert.strictEqual(\n      acct.authority.toBase58(),\n      provider.wallet.publicKey.toBase58(),\n      \"authority must equal the provider wallet\"\n    );\n    // And the level we passed in came back unchanged.\n    assert.strictEqual(acct.level.toNumber(), 7, \"level round-trips\");\n  });\n});\n"
+    },
+    {
+      "path": "tests/hello.ts",
+      "content": "import * as anchor from \"@coral-xyz/anchor\";\nimport { assert } from \"chai\";\n\ndescribe(\"hello :: day 0\", () => {\n  const provider = anchor.AnchorProvider.env();\n  anchor.setProvider(provider);\n  const program = anchor.workspace.hello as anchor.Program;\n\n  it(\"comes online at a level\", async () => {\n    const state = anchor.web3.Keypair.generate();\n    await program.methods\n      .initialize(new anchor.BN(1))\n      .accounts({ state: state.publicKey, authority: provider.wallet.publicKey })\n      .signers([state])\n      .rpc();\n    const acct = await program.account.game.fetch(state.publicKey);\n    assert.equal(acct.level.toNumber(), 1, \"player1 starts at level 1\");\n  });\n});\n"
+    }
+  ]
+}
