@@ -1,5 +1,5 @@
 {
-  "day": 3,
+  "day": 4,
   "score": 1,
   "proven": [
     "baseline: program builds, deploys, and initializes"
@@ -10,5 +10,5 @@
     "cross-program invocation (CPI)",
     "account constraints and validation"
   ],
-  "totalSpentUsd": 6.0162700000000005
+  "totalSpentUsd": 7.7778350000000005
 }
