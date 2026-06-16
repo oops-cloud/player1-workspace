@@ -1,9 +1,10 @@
 {
-  "day": 5,
-  "score": 2,
+  "day": 0,
+  "score": 3,
   "proven": [
     "baseline: program builds, deploys, and initializes",
-    "Anchor TS test harness compiles and runs one assertion"
+    "Anchor TS test harness compiles and runs one assertion",
+    "PDAs: derivation, canonical bump, and the seeds constraint"
   ],
   "gaps": [
     "SPL token transfers",
@@ -11,5 +12,7 @@
     "cross-program invocation (CPI)",
     "account constraints and validation"
   ],
-  "totalSpentUsd": 9.62925
+  "totalSpentUsd": 10.071885,
+  "run": 6,
+  "born": "2026-06-16T20:50:07.834Z"
 }
