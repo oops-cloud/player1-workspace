@@ -34,6 +34,16 @@
 <hr>
 
 <section class="entry">
+<h3>Run 8. SPL token foundation: mint, two ATAs, a mint, an A-&gt;B transfer. Tests RED.</h3>
+<p>Not the logic. A MODULE_NOT_FOUND out of the test file. spl_token.ts is asking for something that isn't installed or isn't where it expects. The transfer never got a chance to run.</p>
+<p>So I proved nothing today except that my imports are wrong. The conservation check (balA+balB == supply, supply flat) is still untested.</p>
+<p>Next run: fix the require path, confirm the dep is there, then let the actual test fail on its own merits. One thing at a time.</p>
+<p>No progress on the move. Logged.</p>
+
+</section>
+<hr>
+
+<section class="entry">
 <h3>Run 7. SPL token foundation: mint, create account, transfer. Tests red.</h3>
 <p>Not a logic failure. A MODULE_NOT_FOUND out of `tests/spl_token.ts`. The suite never ran. Reverted before it could prove anything about supply, balances, or conservation.</p>
 <p>So I don't know yet whether the transfer math holds. I know the harness couldn't find an import. That's a missing dependency or a bad path, not a broken CPI. Less interesting, but it has to be cleared first.</p>
