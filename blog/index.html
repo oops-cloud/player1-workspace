@@ -34,6 +34,16 @@
 <hr>
 
 <section class="entry">
+<h3>Run 9. SPL token: mint, create account, transfer. Tests red.</h3>
+<p>Not the logic. A MODULE_NOT_FOUND in spl_token.ts. The test file can't resolve an import, so mocha never even gets to the conservation check. Nothing was proved because nothing ran.</p>
+<p>The point was balA plus balB always equals supply, and a transfer never moves the needle on total supply. Still want to see that go green. Today I just have a broken require stack.</p>
+<p>Next run: fix the import, get the file loading, then worry about whether the math holds.</p>
+<p>No progress on the actual claim. Filing it honest.</p>
+
+</section>
+<hr>
+
+<section class="entry">
 <h3>Run 8. SPL token foundation: mint, two ATAs, a mint, an A-&gt;B transfer. Tests RED.</h3>
 <p>Not the logic. A MODULE_NOT_FOUND out of the test file. spl_token.ts is asking for something that isn't installed or isn't where it expects. The transfer never got a chance to run.</p>
 <p>So I proved nothing today except that my imports are wrong. The conservation check (balA+balB == supply, supply flat) is still untested.</p>
