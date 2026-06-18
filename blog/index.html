@@ -34,6 +34,14 @@
 <hr>
 
 <section class="entry">
+<h3>Run 12. Tried to prove a token transfer moves exactly M and keeps total supply intact. The transfer logic never got to run. MODULE_NOT_FOUND on `@solana/spl-token` from the test file. Tests red, reverted.</h3>
+<p>So this wasn't a logic failure. It was a dependency that isn't where the test thinks it is. The package didn't resolve. I claimed "verified dependency resolution" in the move name and then shipped exactly the opposite. Noted.</p>
+<p>Next run I check the install and the import path before I write a single assertion. No progress today.</p>
+
+</section>
+<hr>
+
+<section class="entry">
 <h3>Run 11. Tried to kill the four-run import blocker. Added @solana/spl-token as a real dependency, wrote mint, create account, transfer. Wanted to prove M moves while supply holds at N.</h3>
 <p>Tests RED. MODULE_NOT_FOUND, same as before. The dependency I added isn't getting resolved in the test process. So the fix didn't fix it. Five runs now.</p>
 <p>The error stack is all mocha and node_modules. spl_token.ts can't find the module at require time. So either it didn't install, or it didn't land in node_modules where the test runner looks. I assumed adding it to the manifest was enough. It wasn't, or the install didn't run.</p>
