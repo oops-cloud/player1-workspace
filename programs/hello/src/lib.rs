@@ -101,7 +101,57 @@ pub mod hello {
         config.value = value;
         Ok(())
     }
+
+    // Custom-error foundation: a Vault that accumulates a u64 balance.
+    // init_vault sets it to 0.
+    pub fn init_vault(ctx: Context<InitVault>) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        vault.authority = ctx.accounts.authority.key();
+        vault.balance = 0;
+        Ok(())
+    }
+
+    // deposit guards two failure modes with named errors:
+    //   - require!(amount > 0)         => VaultError::AmountZero
+    //   - checked_add overflow         => VaultError::Overflow
+    // On success it returns the new balance via state, so the happy path is
+    // observable. The guards fire BEFORE any mutation, so a rejected deposit
+    // leaves the balance untouched. require_eq! shows a second guard form: the
+    // deposit cannot exceed a per-call cap, else VaultError::ExceedsCap.
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        // Guard 1: reject a zero amount with a named code.
+        require!(amount > 0, VaultError::AmountZero);
+
+        // Guard 2: reject anything over the per-call cap. require_eq! proves the
+        // equality-form macro; here we assert the clamped amount equals amount,
+        // i.e. amount did not exceed the cap.
+        let clamped = amount.min(MAX_DEPOSIT);
+        require_eq!(clamped, amount, VaultError::ExceedsCap);
+
+        let vault = &mut ctx.accounts.vault;
+
+        // Guard 3: checked_add — on overflow, return the named Overflow code
+        // instead of panicking. ok_or maps None to our error.
+        vault.balance = vault
+            .balance
+            .checked_add(amount)
+            .ok_or(VaultError::Overflow)?;
+
+        Ok(())
+    }
+
+    // Helper to force the overflow path deterministically: set balance directly
+    // to a chosen value (only the recorded authority may do it). The test seeds
+    // u64::MAX here, then a deposit of 1 trips the Overflow guard.
+    pub fn set_balance(ctx: Context<SetBalance>, value: u64) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        vault.balance = value;
+        Ok(())
+    }
 }
+
+// Per-call deposit cap. Used by require_eq! to demonstrate a bounded guard.
+pub const MAX_DEPOSIT: u64 = 1_000_000;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -173,6 +223,29 @@ pub struct UpdateConfig<'info> {
     pub authority: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct InitVault<'info> {
+    #[account(init, payer = authority, space = 8 + Vault::SIZE)]
+    pub vault: Account<'info, Vault>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Deposit<'info> {
+    #[account(mut, has_one = authority)]
+    pub vault: Account<'info, Vault>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetBalance<'info> {
+    #[account(mut, has_one = authority)]
+    pub vault: Account<'info, Vault>,
+    pub authority: Signer<'info>,
+}
+
 #[account]
 pub struct Game {
     pub level: u64,
@@ -202,4 +275,26 @@ pub struct Config {
 
 impl Config {
     pub const SIZE: usize = 32 + 8;
+}
+
+#[account]
+pub struct Vault {
+    pub authority: Pubkey,
+    pub balance: u64,
+}
+
+impl Vault {
+    pub const SIZE: usize = 32 + 8;
+}
+
+// Named error codes. Each variant carries a message and an implicit numeric
+// code; the client reads back the variant name via AnchorError.error.errorCode.
+#[error_code]
+pub enum VaultError {
+    #[msg("deposit amount must be greater than zero")]
+    AmountZero,
+    #[msg("deposit would overflow the vault balance")]
+    Overflow,
+    #[msg("deposit exceeds the per-call cap")]
+    ExceedsCap,
 }
