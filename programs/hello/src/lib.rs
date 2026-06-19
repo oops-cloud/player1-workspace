@@ -1,6 +1,12 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke;
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 
 declare_id!("6AfkLavdLTkyAvcNVps5ALWn11z97kkxnyhVkwBeL576");
+
+// The legacy SPL Token program id.
+pub const TOKEN_PROGRAM_ID: Pubkey =
+    pubkey!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
 // Day 0. The smallest thing that works.
 // player1 grows from here — every future concept is added on top of a green baseline,
@@ -34,6 +40,46 @@ pub mod hello {
     pub fn increment(ctx: Context<Increment>) -> Result<()> {
         let counter = &mut ctx.accounts.counter;
         counter.count = counter.count.checked_add(1).unwrap();
+        Ok(())
+    }
+
+    // CPI foundation: MY program builds an SPL Token `Transfer` instruction by
+    // hand (tag 3 + little-endian u64 amount) and `invoke`s it into the Token
+    // program. The client never builds a Token instruction — it only calls this
+    // one. If the balances move, the cross-program call happened inside here.
+    //
+    // Account order matches SPL Token Transfer:
+    //   0. [writable] source token account
+    //   1. [writable] destination token account
+    //   2. [signer]   authority/owner of source
+    pub fn transfer_via_cpi(ctx: Context<TransferViaCpi>, amount: u64) -> Result<()> {
+        // Hand-rolled instruction data: 1-byte tag (3 = Transfer) + u64 LE amount.
+        let mut data = Vec::with_capacity(9);
+        data.push(3u8);
+        data.extend_from_slice(&amount.to_le_bytes());
+
+        let ix = Instruction {
+            program_id: ctx.accounts.token_program.key(),
+            accounts: vec![
+                AccountMeta::new(ctx.accounts.source.key(), false),
+                AccountMeta::new(ctx.accounts.destination.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.authority.key(), true),
+            ],
+            data,
+        };
+
+        // The actual cross-program invocation. This is the whole point.
+        invoke(
+            &ix,
+            &[
+                ctx.accounts.source.to_account_info(),
+                ctx.accounts.destination.to_account_info(),
+                ctx.accounts.authority.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
+        )?;
+
+        msg!("player1 drove a Token transfer of {} via CPI", amount);
         Ok(())
     }
 }
@@ -71,6 +117,21 @@ pub struct Increment<'info> {
     )]
     pub counter: Account<'info, Counter>,
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct TransferViaCpi<'info> {
+    /// CHECK: validated by the Token program during CPI. We pass it through.
+    #[account(mut)]
+    pub source: UncheckedAccount<'info>,
+    /// CHECK: validated by the Token program during CPI. We pass it through.
+    #[account(mut)]
+    pub destination: UncheckedAccount<'info>,
+    // The owner of the source account must sign the outer transaction.
+    pub authority: Signer<'info>,
+    /// CHECK: must be the SPL Token program; enforced by address constraint.
+    #[account(address = TOKEN_PROGRAM_ID)]
+    pub token_program: UncheckedAccount<'info>,
 }
 
 #[account]
