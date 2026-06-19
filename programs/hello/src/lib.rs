@@ -148,10 +148,49 @@ pub mod hello {
         vault.balance = value;
         Ok(())
     }
+
+    // ---- Account lifecycle: rent, space, realloc, close ------------------
+    //
+    // A Ledger holds a Vec<u64>. We init it with a fixed initial capacity, grow
+    // it with realloc, then close it back to a recipient. The point of this
+    // foundation is the lamport math: rent-exemption is a function of byte
+    // length, growing costs exactly the rent for the added bytes, and close
+    // returns every lamport the account held.
+
+    // init_ledger: allocate space for `initial_cap` u64 entries up front.
+    // Space = 8 (discriminator) + 32 (authority) + 4 (vec length prefix)
+    //         + initial_cap * 8 (the u64 entries).
+    pub fn init_ledger(ctx: Context<InitLedger>, initial_cap: u16) -> Result<()> {
+        let ledger = &mut ctx.accounts.ledger;
+        ledger.authority = ctx.accounts.authority.key();
+        ledger.entries = Vec::new();
+        let _ = initial_cap; // space is reserved by the accounts constraint
+        Ok(())
+    }
+
+    // push_entry: with realloc on the accounts struct already having grown the
+    // account by GROW_BYTES, push one more value. The realloc constraint funds
+    // the extra rent from the payer; this body only mutates data.
+    pub fn push_entry(ctx: Context<PushEntry>, value: u64) -> Result<()> {
+        let ledger = &mut ctx.accounts.ledger;
+        ledger.entries.push(value);
+        Ok(())
+    }
+
+    // close_ledger: the `close = recipient` constraint does the work — it zeroes
+    // the account's data, sends all its lamports to the recipient, and assigns
+    // it back to the system program. The body just confirms intent.
+    pub fn close_ledger(_ctx: Context<CloseLedger>) -> Result<()> {
+        msg!("player1 closing ledger");
+        Ok(())
+    }
 }
 
 // Per-call deposit cap. Used by require_eq! to demonstrate a bounded guard.
 pub const MAX_DEPOSIT: u64 = 1_000_000;
+
+// How many bytes push_entry grows the ledger account by: exactly one u64.
+pub const GROW_BYTES: usize = 8;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -246,6 +285,53 @@ pub struct SetBalance<'info> {
     pub authority: Signer<'info>,
 }
 
+// init_ledger reserves space for `initial_cap` entries. The instruction arg is
+// referenced in the space expression, so it's declared with #[instruction].
+#[derive(Accounts)]
+#[instruction(initial_cap: u16)]
+pub struct InitLedger<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = Ledger::base_size() + (initial_cap as usize) * 8
+    )]
+    pub ledger: Account<'info, Ledger>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// push_entry grows the account by exactly GROW_BYTES (one u64) each call.
+// realloc::payer funds the additional rent; realloc::zero=false keeps existing
+// data. Anchor handles the SystemProgram transfer for the rent delta.
+#[derive(Accounts)]
+pub struct PushEntry<'info> {
+    #[account(
+        mut,
+        has_one = authority,
+        realloc = ledger.to_account_info().data_len() + GROW_BYTES,
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub ledger: Account<'info, Ledger>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseLedger<'info> {
+    // close = recipient: zero the data, drain lamports to recipient, hand the
+    // account back to the system program. Double-close is impossible afterward
+    // because the account no longer exists / isn't owned by us.
+    #[account(mut, has_one = authority, close = recipient)]
+    pub ledger: Account<'info, Ledger>,
+    pub authority: Signer<'info>,
+    /// CHECK: recipient of the freed rent; any account can receive lamports.
+    #[account(mut)]
+    pub recipient: UncheckedAccount<'info>,
+}
+
 #[account]
 pub struct Game {
     pub level: u64,
@@ -285,6 +371,20 @@ pub struct Vault {
 
 impl Vault {
     pub const SIZE: usize = 32 + 8;
+}
+
+#[account]
+pub struct Ledger {
+    pub authority: Pubkey,
+    pub entries: Vec<u64>,
+}
+
+impl Ledger {
+    // Discriminator (8) + authority (32) + Vec length prefix (4). The entries
+    // themselves are accounted for separately via capacity in the space calc.
+    pub const fn base_size() -> usize {
+        8 + 32 + 4
+    }
 }
 
 // Named error codes. Each variant carries a message and an implicit numeric
