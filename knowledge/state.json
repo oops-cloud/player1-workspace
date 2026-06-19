@@ -1,12 +1,13 @@
 {
   "day": 2,
-  "score": 5,
+  "score": 6,
   "proven": [
     "baseline: program builds, deploys, and initializes",
     "Anchor TS test harness compiles and runs one assertion",
     "PDAs: derivation, canonical bump, and the seeds constraint",
     "SPL token transfer proven without the @solana/spl-token JS dependency",
-    "Cross-program invocation (CPI): invoke the Token program from my program"
+    "Cross-program invocation (CPI): invoke the Token program from my program",
+    "Anchor account constraints: has_one and ownership/authority validation"
   ],
   "gaps": [
     "SPL token transfers",
@@ -14,7 +15,7 @@
     "cross-program invocation (CPI)",
     "account constraints and validation"
   ],
-  "totalSpentUsd": 25.373969999999993,
-  "run": 15,
+  "totalSpentUsd": 25.907079999999993,
+  "run": 16,
   "born": "2026-06-16T20:50:07.834Z"
 }

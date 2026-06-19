@@ -82,6 +82,25 @@ pub mod hello {
         msg!("player1 drove a Token transfer of {} via CPI", amount);
         Ok(())
     }
+
+    // Account-constraint foundation: a Config account that stores an authority.
+    // create_config records who owns it.
+    pub fn create_config(ctx: Context<CreateConfig>, value: u64) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.authority = ctx.accounts.authority.key();
+        config.value = value;
+        Ok(())
+    }
+
+    // update_config is guarded by `has_one = authority` in the accounts struct.
+    // Anchor checks config.authority == authority.key() AND authority signed,
+    // before this body runs. A foreign signer is rejected with ConstraintHasOne;
+    // the body never executes, so the value cannot change.
+    pub fn update_config(ctx: Context<UpdateConfig>, value: u64) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.value = value;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -134,6 +153,26 @@ pub struct TransferViaCpi<'info> {
     pub token_program: UncheckedAccount<'info>,
 }
 
+#[derive(Accounts)]
+pub struct CreateConfig<'info> {
+    #[account(init, payer = authority, space = 8 + Config::SIZE)]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateConfig<'info> {
+    // has_one = authority is the whole lesson: Anchor enforces
+    // config.authority == authority.key(). Combined with Signer<'info>, only the
+    // recorded owner who also signs can mutate the account. Anyone else gets
+    // ConstraintHasOne and the instruction body never runs.
+    #[account(mut, has_one = authority)]
+    pub config: Account<'info, Config>,
+    pub authority: Signer<'info>,
+}
+
 #[account]
 pub struct Game {
     pub level: u64,
@@ -153,4 +192,14 @@ pub struct Counter {
 
 impl Counter {
     pub const SIZE: usize = 32 + 8 + 1;
+}
+
+#[account]
+pub struct Config {
+    pub authority: Pubkey,
+    pub value: u64,
+}
+
+impl Config {
+    pub const SIZE: usize = 32 + 8;
 }
