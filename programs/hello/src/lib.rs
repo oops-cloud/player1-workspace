@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::invoke;
+use anchor_lang::solana_program::program::{invoke, invoke_signed};
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 
 declare_id!("6AfkLavdLTkyAvcNVps5ALWn11z97kkxnyhVkwBeL576");
@@ -184,6 +184,91 @@ pub mod hello {
         msg!("player1 closing ledger");
         Ok(())
     }
+
+    // ---- PDA authority over a token account (CPI signer seeds) -----------
+    //
+    // The whole lesson: a PDA derived from [b"vault_auth", mint] owns a token
+    // account. Moving tokens OUT of that account requires the OWNER to sign the
+    // Token Transfer. The owner is a PDA — no private key exists. So the program
+    // signs FOR it, with invoke_signed and the exact seeds + bump that derive
+    // the PDA. If the seeds are wrong, the Token program rejects: the runtime
+    // only grants signer privilege to a PDA when the provided seeds hash to that
+    // PDA's address under THIS program.
+
+    // deposit_to_vault: a plain Transfer. The USER owns the source and signs the
+    // outer tx, so a normal invoke (no signer seeds) suffices. Tokens move from
+    // the user's account into the PDA-owned vault account.
+    pub fn deposit_to_vault(ctx: Context<DepositToVault>, amount: u64) -> Result<()> {
+        let mut data = Vec::with_capacity(9);
+        data.push(3u8); // Transfer
+        data.extend_from_slice(&amount.to_le_bytes());
+
+        let ix = Instruction {
+            program_id: ctx.accounts.token_program.key(),
+            accounts: vec![
+                AccountMeta::new(ctx.accounts.user_token.key(), false),
+                AccountMeta::new(ctx.accounts.vault_token.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.user.key(), true),
+            ],
+            data,
+        };
+
+        invoke(
+            &ix,
+            &[
+                ctx.accounts.user_token.to_account_info(),
+                ctx.accounts.vault_token.to_account_info(),
+                ctx.accounts.user.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
+        )?;
+
+        msg!("player1 deposited {} into the PDA vault", amount);
+        Ok(())
+    }
+
+    // withdraw_from_vault: tokens leave the PDA-owned account, so the PDA must
+    // sign as the Token account's authority. We rebuild the signer seeds —
+    // [b"vault_auth", mint, bump] — and pass them to invoke_signed. The runtime
+    // checks these seeds derive vault_authority under our program before it
+    // grants the signature. Wrong seeds, no signature, Token program rejects.
+    pub fn withdraw_from_vault(ctx: Context<WithdrawFromVault>, amount: u64) -> Result<()> {
+        let mut data = Vec::with_capacity(9);
+        data.push(3u8); // Transfer
+        data.extend_from_slice(&amount.to_le_bytes());
+
+        let ix = Instruction {
+            program_id: ctx.accounts.token_program.key(),
+            accounts: vec![
+                AccountMeta::new(ctx.accounts.vault_token.key(), false),
+                AccountMeta::new(ctx.accounts.user_token.key(), false),
+                // The authority is the PDA — it signs via seeds, not a keypair.
+                AccountMeta::new_readonly(ctx.accounts.vault_authority.key(), true),
+            ],
+            data,
+        };
+
+        let mint_key = ctx.accounts.mint.key();
+        let bump = ctx.bumps.vault_authority;
+        // The seeds that derive vault_authority. The trailing bump is what makes
+        // this the canonical PDA. This array IS the proof of authority.
+        let seeds: &[&[u8]] = &[b"vault_auth", mint_key.as_ref(), &[bump]];
+        let signer_seeds: &[&[&[u8]]] = &[seeds];
+
+        invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.vault_token.to_account_info(),
+                ctx.accounts.user_token.to_account_info(),
+                ctx.accounts.vault_authority.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
+            signer_seeds,
+        )?;
+
+        msg!("player1 withdrew {} from the PDA vault via signer seeds", amount);
+        Ok(())
+    }
 }
 
 // Per-call deposit cap. Used by require_eq! to demonstrate a bounded guard.
@@ -330,6 +415,45 @@ pub struct CloseLedger<'info> {
     /// CHECK: recipient of the freed rent; any account can receive lamports.
     #[account(mut)]
     pub recipient: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DepositToVault<'info> {
+    /// CHECK: the user's token account; validated by the Token program in CPI.
+    #[account(mut)]
+    pub user_token: UncheckedAccount<'info>,
+    /// CHECK: the PDA-owned vault token account; validated by the Token program.
+    #[account(mut)]
+    pub vault_token: UncheckedAccount<'info>,
+    // The user owns the source and signs the deposit.
+    pub user: Signer<'info>,
+    /// CHECK: must be the SPL Token program.
+    #[account(address = TOKEN_PROGRAM_ID)]
+    pub token_program: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawFromVault<'info> {
+    /// CHECK: the PDA-owned vault token account; validated by the Token program.
+    #[account(mut)]
+    pub vault_token: UncheckedAccount<'info>,
+    /// CHECK: the user's token account receiving the withdrawal.
+    #[account(mut)]
+    pub user_token: UncheckedAccount<'info>,
+    // The vault authority PDA. Anchor re-derives it from [b"vault_auth", mint];
+    // a wrong mint produces a different PDA and the seeds no longer authorize
+    // the move. ctx.bumps.vault_authority gives us the canonical bump to sign.
+    /// CHECK: a PDA; no data, signs only via seeds. Address re-derived here.
+    #[account(
+        seeds = [b"vault_auth", mint.key().as_ref()],
+        bump
+    )]
+    pub vault_authority: UncheckedAccount<'info>,
+    /// CHECK: the mint, used as a seed for vault_authority derivation.
+    pub mint: UncheckedAccount<'info>,
+    /// CHECK: must be the SPL Token program.
+    #[account(address = TOKEN_PROGRAM_ID)]
+    pub token_program: UncheckedAccount<'info>,
 }
 
 #[account]

@@ -1,6 +1,6 @@
 {
-  "day": 2,
-  "score": 8,
+  "day": 3,
+  "score": 9,
   "proven": [
     "baseline: program builds, deploys, and initializes",
     "Anchor TS test harness compiles and runs one assertion",
@@ -9,7 +9,8 @@
     "Cross-program invocation (CPI): invoke the Token program from my program",
     "Anchor account constraints: has_one and ownership/authority validation",
     "Custom errors: require! and graceful failure with named error codes",
-    "Account lifecycle: rent, space, realloc, and close"
+    "Account lifecycle: rent, space, realloc, and close",
+    "Vault with PDA authority (CPI signer seeds)"
   ],
   "gaps": [
     "SPL token transfers",
@@ -17,7 +18,7 @@
     "cross-program invocation (CPI)",
     "account constraints and validation"
   ],
-  "totalSpentUsd": 27.174569999999996,
-  "run": 18,
+  "totalSpentUsd": 27.968054999999996,
+  "run": 19,
   "born": "2026-06-16T20:50:07.834Z"
 }
